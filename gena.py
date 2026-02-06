@@ -29,16 +29,21 @@ def main():
     print("=" * 60)
     print("🌸 Gena AI - Your Offline Assistant 🌸")
     print("=" * 60)
-    print("Commands: 'exit', 'memory', 'online'")
+    print("Commands:")
+    print("  exit/quit    - End conversation")
+    print("  memory       - Show what I remember")
+    print("  online       - Check connection")
+    print("  teach <name> - Teach me a procedure")
+    print("  recall <name> - Show a learned procedure")
     print("-" * 60)
     
     gena = GenaAI(engine=engine)
     
     # Greeting
     if gena.memory['interaction_count'] == 0:
-        print("\nGena: Hiii! I'm Gena~ What should I call you?\n")
+        print("\nGena: Hiii! I'm Gena! What should I call you?\n")
     else:
-        print(f"\nGena: Welcome back! We've chatted {gena.memory['interaction_count']} times~\n")
+        print(f"\nGena: Welcome back! We've chatted {gena.memory['interaction_count']} times before!\n")
     
     try:
         while True:
@@ -50,7 +55,7 @@ def main():
                 
                 # Commands
                 if user_input.lower() in ['exit', 'quit', 'bye']:
-                    print("\nGena: Bye bye! See you~ 👋\n")
+                    print("\nGena: Bye bye! See you next time! 👋\n")
                     break
                 
                 if user_input.lower() == 'memory':
@@ -62,6 +67,36 @@ def main():
                 if user_input.lower() == 'online':
                     status = "online ✓" if gena.check_online() else "offline ✗"
                     print(f"\nGena: I'm {status}!\n")
+                    continue
+                
+                if user_input.lower().startswith('teach '):
+                    name = user_input[6:].strip()
+                    print(f"Teaching '{name}'. Enter steps (one per line). Type 'done' when finished:")
+                    steps = []
+                    while True:
+                        step = input("  Step: ").strip()
+                        if step.lower() == 'done':
+                            break
+                        if step:
+                            steps.append(step)
+                    
+                    if steps:
+                        result = gena.learn_procedure(name, steps)
+                        print(f"\nGena: {result}\n")
+                    else:
+                        print("\nGena: No steps provided!\n")
+                    continue
+                
+                if user_input.lower().startswith('recall '):
+                    name = user_input[7:].strip()
+                    if name in gena.memory['learned_procedures']:
+                        proc = gena.memory['learned_procedures'][name]
+                        print(f"\nGena: Here's how to {name}:")
+                        for i, step in enumerate(proc['steps'], 1):
+                            print(f"  {i}. {step}")
+                        print()
+                    else:
+                        print(f"\nGena: I don't know how to {name} yet!\n")
                     continue
                 
                 # Chat

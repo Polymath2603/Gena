@@ -28,14 +28,20 @@ class OllamaEngine:
                         "top_p": 0.9,
                         "num_predict": 200,
                         "num_ctx": 2048,
-                        "num_thread": 4
+                        "num_thread": 4,
+                        "stop": ["User:", "You:", "\nU:", "\nYou:", "\nGena:", "U:", "G:"]  # Stop before continuing conversation
                     }
                 },
                 timeout=self.timeout
             )
             
             if response.status_code == 200:
-                return response.json().get("response", "").strip()
+                text = response.json().get("response", "").strip()
+                # Remove any conversation artifacts that slipped through
+                import re
+                text = re.sub(r'\n[UG]:', '', text)  # Remove U: or G: at line starts
+                text = re.sub(r'\s+', ' ', text)  # Normalize whitespace
+                return text.strip()
             else:
                 return f"Hmm, error {response.status_code}..."
         

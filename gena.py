@@ -1,119 +1,99 @@
-#!/usr/bin/env python3
 """
-Gena AI - Main Script
-Import the engine you want to use!
+Gena AI - Main Coordinator
+Brings together engine, memory, and tools
 """
 
-import sys
-import json
-from gena_core import GenaAI
-
-# ==================== CHOOSE YOUR ENGINE ====================
-
-# Option 1: Ollama (uncomment to use)
-from engine_ollama import OllamaEngine
-engine = OllamaEngine(model="hf.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF:Q4_K_M")
-
-# Option 2: llama.cpp (uncomment to use)
-# from engine_llamacpp import LlamaCppEngine
-# engine = LlamaCppEngine(
-#     model_path="/path/to/qwen2.5-1.5b-instruct-q4_k_m.gguf",
-#     port=8080,
-#     auto_start=True
-# )
-
-# ============================================================
+import requests
+from memory import Memory
+from tools import Tools
 
 
-def main():
-    print("=" * 60)
-    print("🌸 Gena AI - Your Offline Assistant 🌸")
-    print("=" * 60)
-    print("Commands:")
-    print("  exit/quit    - End conversation")
-    print("  memory       - Show what I remember")
-    print("  online       - Check connection")
-    print("  teach <name> - Teach me a procedure")
-    print("  recall <name> - Show a learned procedure")
-    print("-" * 60)
+class Gena:
+    """Main Gena AI class - coordinates all components"""
     
-    gena = GenaAI(engine=engine)
+    def __init__(self, engine, memory_db="memory.db"):
+        """
+        Initialize Gena
+        
+        Args:
+            engine: Backend engine (OllamaEngine or LlamaCppEngine)
+            memory_db: Path to memory database
+        """
+        self.engine = engine
+        self.memory = Memory(memory_db)
+        self.tools = Tools()
+        self.online = self._check_online()
+        
+        # System prompt (personality)
+        self.system_prompt = """You are Gena, a cute AI assistant!
+
+Traits: Playful, curious, slightly jealous of other AIs, caring, honest.
+Style: Natural, concise, occasional emojis (sparingly!). Speak normally without quirky symbols like ~.
+Rules: Never make up info. Never simulate the user's responses. Stop after YOUR response only.
+""" + Tools.get_tool_descriptions()
     
-    # Greeting
-    if gena.memory['interaction_count'] == 0:
-        print("\nGena: Hiii! I'm Gena! What should I call you?\n")
-    else:
-        print(f"\nGena: Welcome back! We've chatted {gena.memory['interaction_count']} times before!\n")
+    def _check_online(self):
+        """Check if internet is available"""
+        try:
+            requests.get("https://www.google.com", timeout=2)
+            return True
+        except:
+            return False
     
-    try:
-        while True:
-            try:
-                user_input = input("You: ").strip()
-                
-                if not user_input:
-                    continue
-                
-                # Commands
-                if user_input.lower() in ['exit', 'quit', 'bye']:
-                    print("\nGena: Bye bye! See you next time! 👋\n")
-                    break
-                
-                if user_input.lower() == 'memory':
-                    print(f"\nGena's Memory:")
-                    print(json.dumps(gena.memory, indent=2, ensure_ascii=False))
-                    print()
-                    continue
-                
-                if user_input.lower() == 'online':
-                    status = "online ✓" if gena.check_online() else "offline ✗"
-                    print(f"\nGena: I'm {status}!\n")
-                    continue
-                
-                if user_input.lower().startswith('teach '):
-                    name = user_input[6:].strip()
-                    print(f"Teaching '{name}'. Enter steps (one per line). Type 'done' when finished:")
-                    steps = []
-                    while True:
-                        step = input("  Step: ").strip()
-                        if step.lower() == 'done':
-                            break
-                        if step:
-                            steps.append(step)
-                    
-                    if steps:
-                        result = gena.learn_procedure(name, steps)
-                        print(f"\nGena: {result}\n")
-                    else:
-                        print("\nGena: No steps provided!\n")
-                    continue
-                
-                if user_input.lower().startswith('recall '):
-                    name = user_input[7:].strip()
-                    if name in gena.memory['learned_procedures']:
-                        proc = gena.memory['learned_procedures'][name]
-                        print(f"\nGena: Here's how to {name}:")
-                        for i, step in enumerate(proc['steps'], 1):
-                            print(f"  {i}. {step}")
-                        print()
-                    else:
-                        print(f"\nGena: I don't know how to {name} yet!\n")
-                    continue
-                
-                # Chat
-                response = gena.chat(user_input)
-                print(f"\nGena: {response}\n")
+    def get_full_prompt(self, user_message):
+        """Build complete prompt with system + memory + user message"""
+        context = self.memory.get_context_summary()
+        context += f"Online: {'Yes' if self.online else 'No'}\n"
+        
+        full_prompt = f"{self.system_prompt}\n{context}\n\nUser: {user_message}\nGena:"
+        return full_prompt
+    
+    def chat(self, user_message):
+        """
+        Main chat interface
+        
+        Args:
+            user_message: User's message
             
-            except KeyboardInterrupt:
-                print("\n\nGena: Goodbye! 👋\n")
-                break
-            except Exception as e:
-                print(f"\nError: {e}\n")
+        Returns:
+            Gena's response
+        """
+        # Increment interaction count
+        self.memory.increment_interaction_count()
+        
+        # Save user message
+        self.memory.add_message('user', user_message)
+        
+        # Build prompt and generate
+        prompt = self.get_full_prompt(user_message)
+        response = self.engine.generate(prompt)
+        
+        # Process any tool calls
+        response = self.tools.process_tool_calls(
+            response, 
+            self.memory,
+            callback_map={}  # Add custom tool callbacks here if needed
+        )
+        
+        # Save Gena's response
+        self.memory.add_message('assistant', response)
+        
+        # Clean up old conversations
+        self.memory.clear_old_conversations(keep_last=20)
+        
+        return response
     
-    finally:
-        # Cleanup
-        if hasattr(engine, 'stop_server'):
-            engine.stop_server()
-
-
-if __name__ == "__main__":
-    main()
+    def get_stats(self):
+        """Get memory statistics"""
+        return {
+            'interaction_count': self.memory.get_metadata('interaction_count'),
+            'facts_count': self.memory.get_facts_count(),
+            'procedures': self.memory.get_procedures_list(),
+            'online': self.online
+        }
+    
+    def shutdown(self):
+        """Clean shutdown"""
+        self.memory.close()
+        if hasattr(self.engine, 'stop_server'):
+            self.engine.stop_server()

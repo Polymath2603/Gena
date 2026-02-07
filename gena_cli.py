@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Gena AI - CLI Interface
-Beautiful command-line chat interface
+Pure text interface - no core logic here!
 """
 
 import sys
@@ -10,184 +10,111 @@ from gena import Gena
 
 # ==================== ENGINE CONFIGURATION ====================
 
-# Choose your engine here:
-
-# Option 1: Ollama (default)
 from engine_ollama import OllamaEngine
 engine = OllamaEngine(
-    model="qwen2.5-1.5b-instruct",  # or "hf.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF:Q4_K_M"
+    model="qwen2.5:0.5b-instruct",
     temperature=0.8,
     num_predict=200,
     num_ctx=2048,
     num_thread=4
 )
 
-# Option 2: llama.cpp (uncomment to use)
-# from engine_llamacpp import LlamaCppEngine
-# engine = LlamaCppEngine(
-#     model_path="models/chat/qwen2.5-1.5b-instruct-q4_k_m.gguf",
-#     port=8080,
-#     temperature=0.8,
-#     max_tokens=200,
-#     context_size=2048,
-#     num_threads=4,
-#     auto_start=True
-# )
-
 # ==============================================================
 
 
-def print_header():
-    """Print welcome header"""
-    print("=" * 60)
-    print("🌸 Gena AI - Your Offline Assistant 🌸")
-    print("=" * 60)
-    print("\nCommands:")
-    print("  exit/quit        - End conversation")
-    print("  memory           - Show what I remember")
-    print("  online           - Check connection status")
-    print("  teach <name>     - Teach me a procedure")
-    print("  recall <name>    - Show learned procedure")
-    print("  stats            - Show my statistics")
-    print("  help             - Show this help")
-    print("-" * 60)
-
-
-def print_memory(gena):
-    """Display memory contents"""
-    print("\n" + "=" * 60)
-    print("GENA'S MEMORY")
-    print("=" * 60)
-    
-    data = gena.memory.export_all()
-    print(json.dumps(data, indent=2, ensure_ascii=False))
-    print("=" * 60 + "\n")
-
-
-def print_stats(gena):
-    """Display statistics"""
-    stats = gena.get_stats()
-    print("\n" + "=" * 60)
-    print("STATISTICS")
-    print("=" * 60)
-    print(f"Total conversations: {stats['interaction_count']}")
-    print(f"Facts learned: {stats['facts_count']}")
-    print(f"Procedures learned: {len(stats['procedures'])}")
-    if stats['procedures']:
-        print(f"  - {', '.join(stats['procedures'])}")
-    print(f"Online status: {'✓ Connected' if stats['online'] else '✗ Offline'}")
-    print("=" * 60 + "\n")
-
-
-def teach_procedure(gena):
-    """Interactive procedure teaching"""
-    name = input("Procedure name: ").strip()
-    if not name:
-        print("Cancelled.\n")
-        return
-    
-    print(f"Teaching '{name}'. Enter steps (one per line). Type 'done' when finished:")
-    steps = []
-    while True:
-        step = input("  Step: ").strip()
-        if step.lower() == 'done':
-            break
-        if step:
-            steps.append(step)
-    
-    if steps:
-        result = gena.memory.learn_procedure(name, steps)
-        print(f"\nGena: {result}\n")
-    else:
-        print("\nNo steps provided!\n")
-
-
-def recall_procedure(gena, name):
-    """Display learned procedure"""
-    proc = gena.memory.get_procedure(name)
-    if proc:
-        print(f"\nGena: Here's how to {name}:")
-        for i, step in enumerate(proc, 1):
-            print(f"  {i}. {step}")
-        print()
-    else:
-        print(f"\nGena: I don't know how to {name} yet!\n")
-
-
-def print_help():
-    """Display help"""
-    print("\n" + "=" * 60)
-    print("HELP")
-    print("=" * 60)
-    print("Commands:")
-    print("  exit, quit, bye  - Exit Gena")
-    print("  memory           - View all stored memory")
-    print("  online           - Check internet connection")
-    print("  teach <name>     - Teach a procedure step by step")
-    print("  recall <name>    - View a learned procedure")
-    print("  stats            - View statistics")
-    print("  help             - Show this help")
-    print("\nJust chat normally for everything else!")
-    print("=" * 60 + "\n")
-
-
 def main():
-    """Main CLI loop"""
-    print_header()
+    """Main CLI loop - PURE INTERFACE ONLY"""
+    print("=" * 60)
+    print("🌸 Gena AI - Text Interface 🌸")
+    print("=" * 60)
+    print("\nCommands: exit, memory, online, teach, recall <n>, stats, help")
+    print("-" * 60)
     
     # Initialize Gena
-    print("\nInitializing Gena...")
-    gena = Gena(engine=engine, memory_db="memory.db")
+    gena = Gena(engine=engine)
     
     # Greeting
-    count = gena.memory.get_metadata('interaction_count')
-    if int(count) == 0:
-        print("\nGena: Hiii! I'm Gena! What should I call you?\n")
-    else:
-        print(f"\nGena: Welcome back! We've chatted {count} times before!\n")
+    print(f"\nGena: {gena.get_greeting()}\n")
     
     try:
         while True:
             try:
                 user_input = input("You: ").strip()
-                
                 if not user_input:
                     continue
                 
-                # Commands
-                cmd_lower = user_input.lower()
+                cmd = user_input.lower()
                 
-                if cmd_lower in ['exit', 'quit', 'bye']:
+                # Exit
+                if cmd in ['exit', 'quit', 'bye']:
                     print("\nGena: Bye bye! See you next time! 👋\n")
                     break
                 
-                if cmd_lower == 'memory':
-                    print_memory(gena)
+                # Memory
+                if cmd == 'memory':
+                    print(f"\n{'='*60}\nMEMORY\n{'='*60}")
+                    print(json.dumps(gena.export_memory(), indent=2))
+                    print("=" * 60 + "\n")
                     continue
                 
-                if cmd_lower == 'online':
-                    status = "online ✓" if gena.online else "offline ✗"
-                    print(f"\nGena: I'm {status}!\n")
+                # Online
+                if cmd == 'online':
+                    print(f"\nGena: I'm {'online ✓' if gena.online else 'offline ✗'}!\n")
                     continue
                 
-                if cmd_lower == 'stats':
-                    print_stats(gena)
+                # Stats
+                if cmd == 'stats':
+                    stats = gena.get_stats()
+                    print(f"\n{'='*60}\nSTATS\n{'='*60}")
+                    print(f"Chats: {stats['interaction_count']}")
+                    print(f"Facts: {stats['facts_count']}")
+                    print(f"Procedures: {', '.join(stats['procedures']) if stats['procedures'] else 'none'}")
+                    print(f"Online: {'✓' if stats['online'] else '✗'}")
+                    print("=" * 60 + "\n")
                     continue
                 
-                if cmd_lower == 'help':
-                    print_help()
+                # Help
+                if cmd == 'help':
+                    print("\nCommands:")
+                    print("  exit       - End chat")
+                    print("  memory     - Show memory")
+                    print("  online     - Check connection")
+                    print("  teach      - Teach procedure")
+                    print("  recall <n> - Show procedure")
+                    print("  stats      - Show stats\n")
                     continue
                 
-                if cmd_lower.startswith('teach'):
-                    teach_procedure(gena)
+                # Teach
+                if cmd == 'teach':
+                    name = input("Name: ").strip()
+                    if not name:
+                        continue
+                    print("Steps (one per line, 'done' to finish):")
+                    steps = []
+                    while True:
+                        step = input("  ").strip()
+                        if step.lower() == 'done':
+                            break
+                        if step:
+                            steps.append(step)
+                    if steps:
+                        print(f"\nGena: {gena.teach_procedure(name, steps)}\n")
                     continue
                 
-                if cmd_lower.startswith('recall '):
+                # Recall
+                if cmd.startswith('recall '):
                     name = user_input[7:].strip()
-                    recall_procedure(gena, name)
+                    proc = gena.recall_procedure(name)
+                    if proc:
+                        print(f"\nGena: Here's how to {name}:")
+                        for i, step in enumerate(proc['steps'], 1):
+                            print(f"  {i}. {step}")
+                        print()
+                    else:
+                        print(f"\nGena: I don't know how to {name}!\n")
                     continue
                 
-                # Regular chat
+                # Chat
                 response = gena.chat(user_input)
                 print(f"\nGena: {response}\n")
             
@@ -196,11 +123,8 @@ def main():
                 break
             except Exception as e:
                 print(f"\nError: {e}\n")
-                import traceback
-                traceback.print_exc()
     
     finally:
-        # Cleanup
         gena.shutdown()
 
 
